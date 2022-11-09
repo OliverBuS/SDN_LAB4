@@ -27,8 +27,10 @@ import java.util.Map;
 import org.projectfloodlight.openflow.protocol.OFFactories;
 import org.projectfloodlight.openflow.protocol.OFMessage;
 import org.projectfloodlight.openflow.protocol.OFPacketIn;
+import org.projectfloodlight.openflow.protocol.OFPacketOut;
 import org.projectfloodlight.openflow.protocol.OFType;
 import org.projectfloodlight.openflow.protocol.OFVersion;
+import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.protocol.match.Match;
 import org.projectfloodlight.openflow.protocol.match.MatchField;
 import org.projectfloodlight.openflow.types.DatapathId;
@@ -37,6 +39,7 @@ import org.projectfloodlight.openflow.types.IPv4Address;
 import org.projectfloodlight.openflow.types.IPv4AddressWithMask;
 import org.projectfloodlight.openflow.types.IpProtocol;
 import org.projectfloodlight.openflow.types.MacAddress;
+import org.projectfloodlight.openflow.types.OFBufferId;
 import org.projectfloodlight.openflow.types.OFPort;
 import org.projectfloodlight.openflow.types.TransportPort;
 
@@ -50,9 +53,12 @@ import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.devicemanager.IDeviceService;
 
+import java.io.IOException;
 import java.util.ArrayList;
 
+import net.floodlightcontroller.packet.Data;
 import net.floodlightcontroller.packet.Ethernet;
+import net.floodlightcontroller.packet.IPacket;
 import net.floodlightcontroller.packet.IPv4;
 import net.floodlightcontroller.packet.TCP;
 import net.floodlightcontroller.packet.UDP;
@@ -565,11 +571,66 @@ IFloodlightModule {
 				if (logger.isTraceEnabled()) {
 					logger.trace("Blocking malformed broadcast traffic for PacketIn={}", pi);
 				}
-
+				
 				decision = new RoutingDecision(sw.getId(), inPort,
 						IDeviceService.fcStore.get(cntx, IDeviceService.CONTEXT_SRC_DEVICE),
 						IRoutingDecision.RoutingAction.DROP);
 				decision.addToContext(cntx);
+				
+				//Validamos si es IPv4
+		        if(eth.getEtherType().equals(EthType.IPv4)) {
+			        IPv4 ip = (IPv4) eth.getPayload();
+				///Validamos si es TCP
+			        if (ip.getProtocol().equals(IpProtocol.TCP)) {
+			        	TCP tcp = (TCP) ip.getPayload();
+					///Validamos si el FLAG es SYN
+			        	if(tcp.getFlags() == (short) 2){
+			        		logger.info("New TCP connection found, rejecting");
+						///Elaboramos el paquete a responder, desde la capa superior hacia abajo
+			        		IPacket tcpLayer = new TCP()
+							.setSourcePort(tcp.getDestinationPort())
+							.setDestinationPort(tcp.getSourcePort())
+							.setSequence(tcp.getSequence()+1)
+							.setAcknowledge(tcp.getSequence()+1)
+							.setFlags((short) 22) //RST, ACK y SYN
+							.setWindowSize((short) 0)
+							.setPayload(new Data(new byte[] {0x01}));
+			        		IPacket ipLayer = new IPv4()
+			        		.setSourceAddress(ip.getDestinationAddress())
+			        		.setDestinationAddress(ip.getSourceAddress())
+						.setTtl((byte) 128)
+						.setPayload(tcpLayer);
+			        		IPacket packet = new Ethernet()
+			        	    		.setSourceMACAddress(eth.getDestinationMACAddress())
+			        			.setDestinationMACAddress(eth.getSourceMACAddress())
+			        			.setEtherType(EthType.IPv4)
+			        			.setPayload(ipLayer);
+			        		byte[] data = packet.serialize();
+						///Construimos el OpenFlow PacketOut
+			        		List<OFAction> actionList = new ArrayList<>();
+			        		actionList.add(sw.getOFFactory().actions().output(inPort, Integer.MAX_VALUE));
+						OFPacketOut.Builder po = sw.getOFFactory().buildPacketOut()
+			                		.setData(data)
+			                		.setActions(actionList)
+			                		.setInPort(OFPort.CONTROLLER)
+			                		.setBufferId(OFBufferId.NO_BUFFER);
+						///Enviamos el PacketOut
+			        		try {
+			        			if (logger.isTraceEnabled()) {
+			        				logger.trace("Writing flood PacketOut switch={} packet-in={} packet-out={}",
+			        						new Object[] {sw, pi, po.build()});
+			        			}
+			        			sw.write(po.build());
+			        		} catch (Exception e) {
+			        			logger.error("Failure writing PacketOut switch={} packet-in={} packet-out={}",
+			        					new Object[] {sw, pi, po.build()}, e);
+			        		}                
+						
+			        	}
+			        }
+		        }
+		        
+		        
 			}
 			return Command.CONTINUE;
 		}

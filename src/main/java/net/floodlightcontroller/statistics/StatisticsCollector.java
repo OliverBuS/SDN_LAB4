@@ -62,6 +62,10 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	private static final HashMap<NodePortTuple, SwitchPortBandwidth> portStats = new HashMap<NodePortTuple, SwitchPortBandwidth>();
 	private static final HashMap<NodePortTuple, SwitchPortBandwidth> tentativePortStats = new HashMap<NodePortTuple, SwitchPortBandwidth>();
 
+	
+	private static U64 TX_THRESHOLD = U64.of((long) 1000000);
+	private static U64 RX_THRESHOLD = U64.of((long) 1000000);
+	
 	/**
 	 * Run periodically to collect all port statistics. This only collects
 	 * bandwidth stats right now, but it could be expanded to record other
@@ -85,6 +89,7 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 
 		@Override
 		public void run() {
+			
 			Map<DatapathId, List<OFStatsReply>> replies = getSwitchStatistics(switchService.getAllSwitchDpids(), OFStatsType.PORT);
 			for (Entry<DatapathId, List<OFStatsReply>> e : replies.entrySet()) {
 				for (OFStatsReply r : e.getValue()) {
@@ -102,6 +107,8 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 								log.error("Inconsistent state between tentative and official port stats lists.");
 								return;
 							}
+							
+							
 
 							/* Get counted bytes over the elapsed period. Check for counter overflow. */
 							U64 rxBytesCounted;
@@ -120,6 +127,17 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 							} else {
 								txBytesCounted = pse.getTxBytes().subtract(spb.getPriorByteValueTx());
 							}
+							
+							if( TX_THRESHOLD.compareTo(pse.getTxBytes()) >0) {
+								log.trace("Se ha superado el valor umbral de {} para TxBytes", TX_THRESHOLD);
+							}
+							
+							if( RX_THRESHOLD.compareTo(pse.getRxBytes()) >0) {
+								log.trace("Se ha superado el valor umbral de {} para RxBytes", RX_THRESHOLD);
+							}
+							
+							
+							
 							long timeDifSec = (System.currentTimeMillis() - spb.getUpdateTime()) / MILLIS_PER_SEC;
 							portStats.put(npt, SwitchPortBandwidth.of(npt.getNodeId(), npt.getPortId(), 
 									U64.ofRaw((rxBytesCounted.getValue() * BITS_PER_BYTE) / timeDifSec), 
@@ -218,10 +236,23 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 		if (config.containsKey(INTERVAL_PORT_STATS_STR)) {
 			try {
 				portStatsInterval = Integer.parseInt(config.get(INTERVAL_PORT_STATS_STR).trim());
+				
 			} catch (Exception e) {
 				log.error("Could not parse '{}'. Using default of {}", INTERVAL_PORT_STATS_STR, portStatsInterval);
 			}
 		}
+			
+		if(config.containsKey("PortTxThreshold") && config.containsKey("PortRxThreshold")) {
+			try {
+				TX_THRESHOLD =  U64.of(Long.parseLong((config.get("PortTxThreshold").trim())));
+				RX_THRESHOLD =  U64.of(Long.parseLong((config.get("PortRxThreshold").trim())));
+			} catch (Exception e) {
+				log.error("Could not parse umbral values for Tx and Rx. Using default of 1000000");
+			}
+			
+			
+		} 
+		
 		log.info("Port statistics collection interval set to {}s", portStatsInterval);
 	}
 

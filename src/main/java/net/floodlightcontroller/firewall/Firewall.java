@@ -53,7 +53,6 @@ import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.devicemanager.IDeviceService;
 
-import java.io.IOException;
 import java.util.ArrayList;
 
 import net.floodlightcontroller.packet.Data;

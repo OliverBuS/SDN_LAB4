@@ -1,6 +1,7 @@
 package net.floodlightcontroller.statistics;
 
 import java.lang.Thread.State;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -12,6 +13,8 @@ import java.util.Set;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.projectfloodlight.openflow.protocol.OFFlowStatsEntry;
+import org.projectfloodlight.openflow.protocol.OFFlowStatsReply;
 import org.projectfloodlight.openflow.protocol.OFPortStatsEntry;
 import org.projectfloodlight.openflow.protocol.OFPortStatsReply;
 import org.projectfloodlight.openflow.protocol.OFStatsReply;
@@ -24,6 +27,7 @@ import org.projectfloodlight.openflow.types.DatapathId;
 import org.projectfloodlight.openflow.types.OFPort;
 import org.projectfloodlight.openflow.types.TableId;
 import org.projectfloodlight.openflow.types.U64;
+import org.sdnplatform.sync.internal.util.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +56,9 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	
 	private static int portStatsInterval = 10; /* could be set by REST API, so not final */
 	private static ScheduledFuture<?> portStatsCollector;
+	
+	private static int flowStatsInterval = 10;
+	private static ScheduledFuture<?> flowStatsCollector;
 
 	private static final long BITS_PER_BYTE = 8;
 	private static final long MILLIS_PER_SEC = 1000;
@@ -60,9 +67,9 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	private static final String ENABLED_STR = "enable";
 
 	private static final HashMap<NodePortTuple, SwitchPortBandwidth> portStats = new HashMap<NodePortTuple, SwitchPortBandwidth>();
+	private static final HashMap<Pair<DatapathId,U64>, FlowBandwidth> flowStats = new HashMap<Pair<DatapathId,U64>, FlowBandwidth>();
 	private static final HashMap<NodePortTuple, SwitchPortBandwidth> tentativePortStats = new HashMap<NodePortTuple, SwitchPortBandwidth>();
 
-	
 	private static U64 TX_THRESHOLD = U64.of((long) 1000000);
 	private static U64 RX_THRESHOLD = U64.of((long) 1000000);
 	
@@ -104,12 +111,9 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 								spb = tentativePortStats.get(npt);
 								tentativePortStats.remove(npt);
 							} else {
-								log.error("Inconsistent state between tentative and official port stats lists.");
+								log.error("Inconsistent state");
 								return;
 							}
-							
-							
-
 							/* Get counted bytes over the elapsed period. Check for counter overflow. */
 							U64 rxBytesCounted;
 							U64 txBytesCounted;
@@ -128,15 +132,13 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 								txBytesCounted = pse.getTxBytes().subtract(spb.getPriorByteValueTx());
 							}
 							
-							if( TX_THRESHOLD.compareTo(pse.getTxBytes()) >0) {
+							if( TX_THRESHOLD.compareTo(txBytesCounted) <0) {
 								log.trace("Se ha superado el valor umbral de {} para TxBytes", TX_THRESHOLD);
 							}
 							
-							if( RX_THRESHOLD.compareTo(pse.getRxBytes()) >0) {
+							if( RX_THRESHOLD.compareTo(rxBytesCounted) <0) {
 								log.trace("Se ha superado el valor umbral de {} para RxBytes", RX_THRESHOLD);
 							}
-							
-							
 							
 							long timeDifSec = (System.currentTimeMillis() - spb.getUpdateTime()) / MILLIS_PER_SEC;
 							portStats.put(npt, SwitchPortBandwidth.of(npt.getNodeId(), npt.getPortId(), 
@@ -153,6 +155,29 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 			}
 		}
 	}
+	
+	/**
+	 Clase a implementar para recollectar estadisticas de todos los flows
+	 */
+	private class FlowStatsCollector implements Runnable {
+
+		@Override
+		public void run() {
+			Map<DatapathId, List<OFStatsReply>> replies = getSwitchStatistics(switchService.getAllSwitchDpids(), OFStatsType.FLOW);
+			for (Entry<DatapathId, List<OFStatsReply>> e : replies.entrySet()) {
+				for (OFStatsReply r : e.getValue()) {
+					OFFlowStatsReply psr = (OFFlowStatsReply) r;
+					for (OFFlowStatsEntry pse : psr.getEntries()) {
+						log.trace("|Actividad 3| Flow ({},{}-{})",pse.getCookie().toString(),(pse.getPacketCount().toString()+ "-" + pse.getByteCount()));
+						
+					}
+				}
+			}
+		}
+	}
+	
+	
+	
 
 	/**
 	 * Single thread for collecting switch statistics and
@@ -301,6 +326,7 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	 */
 	private void startStatisticsCollection() {
 		portStatsCollector = threadPoolService.getScheduledExecutor().scheduleAtFixedRate(new PortStatsCollector(), portStatsInterval, portStatsInterval, TimeUnit.SECONDS);
+		flowStatsCollector = threadPoolService.getScheduledExecutor().scheduleAtFixedRate(new FlowStatsCollector(), flowStatsInterval, flowStatsInterval, TimeUnit.SECONDS);
 		tentativePortStats.clear(); /* must clear out, otherwise might have huge BW result if present and wait a long time before re-enabling stats */
 		log.warn("Statistics collection thread(s) started");
 	}

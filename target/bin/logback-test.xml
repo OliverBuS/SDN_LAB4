@@ -21,4 +21,5 @@
   <logger name="net.floodlightcontroller.core" level="INFO"></logger>
   <logger name="net.floodlightcontroller.topology" level="INFO" ></logger>
   <logger name="org.projectfloodlight.openflow" level="INFO" ></logger>
+  <logger name="net.floodlightcontroller.firewall" level="TRACE"></logger>
 </configuration>

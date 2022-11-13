@@ -70,8 +70,8 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	private static final HashMap<Pair<DatapathId,U64>, FlowBandwidth> flowStats = new HashMap<Pair<DatapathId,U64>, FlowBandwidth>();
 	private static final HashMap<NodePortTuple, SwitchPortBandwidth> tentativePortStats = new HashMap<NodePortTuple, SwitchPortBandwidth>();
 
-	private static U64 TX_THRESHOLD = U64.of((long) 1000000);
-	private static U64 RX_THRESHOLD = U64.of((long) 1000000);
+	private static long TX_THRESHOLD = (long) 1000000;
+	private static long RX_THRESHOLD = (long) 1000000;
 	
 	/**
 	 * Run periodically to collect all port statistics. This only collects
@@ -132,12 +132,14 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 								txBytesCounted = pse.getTxBytes().subtract(spb.getPriorByteValueTx());
 							}
 							
-							if( TX_THRESHOLD.compareTo(txBytesCounted) <0) {
-								log.trace("Se ha superado el valor umbral de {} para TxBytes", TX_THRESHOLD);
+							String msg = "En el switch " + spb.getSwitchId().toString() + " puerto " + spb.getSwitchPort() ;
+							if( (U64.of(TX_THRESHOLD)).compareTo(txBytesCounted) <0) {
+								
+								log.info(msg+ " se ha superado el valor umbral de {} para TxBytes",  TX_THRESHOLD );
 							}
 							
-							if( RX_THRESHOLD.compareTo(rxBytesCounted) <0) {
-								log.trace("Se ha superado el valor umbral de {} para RxBytes", RX_THRESHOLD);
+							if( (U64.of(RX_THRESHOLD)).compareTo(rxBytesCounted) <0) {
+								log.info(msg+" se ha superado el valor umbral de {} para RxBytes", RX_THRESHOLD);
 							}
 							
 							long timeDifSec = (System.currentTimeMillis() - spb.getUpdateTime()) / MILLIS_PER_SEC;
@@ -168,7 +170,14 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 				for (OFStatsReply r : e.getValue()) {
 					OFFlowStatsReply psr = (OFFlowStatsReply) r;
 					for (OFFlowStatsEntry pse : psr.getEntries()) {
-						log.trace("|Actividad 3| Flow ({},{}-{})",pse.getCookie().toString(),(pse.getPacketCount().toString()+ "-" + pse.getByteCount()));
+						String sw = e.getKey().toString();
+						String flowCookie = pse.getCookie().toString();
+						String flowInfo = pse.getMatch().toString();
+						String statistics = "PacketCount: " + pse.getPacketCount().getValue();
+						statistics += " ByteCount: " + pse.getPacketCount().getValue();
+						statistics += " IdleTime: "+ pse.getIdleTimeout();
+						
+						log.info("FlowStats-->switch:"+sw+" cookie:"+flowCookie+"("+flowInfo+")\n\t\t\t"+statistics);
 						
 					}
 				}
@@ -269,8 +278,8 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 			
 		if(config.containsKey("PortTxThreshold") && config.containsKey("PortRxThreshold")) {
 			try {
-				TX_THRESHOLD =  U64.of(Long.parseLong((config.get("PortTxThreshold").trim())));
-				RX_THRESHOLD =  U64.of(Long.parseLong((config.get("PortRxThreshold").trim())));
+				TX_THRESHOLD =  (Long.parseLong((config.get("PortTxThreshold").trim())));
+				RX_THRESHOLD =  (Long.parseLong((config.get("PortRxThreshold").trim())));
 			} catch (Exception e) {
 				log.error("Could not parse umbral values for Tx and Rx. Using default of 1000000");
 			}

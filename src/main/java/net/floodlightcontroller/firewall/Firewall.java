@@ -575,6 +575,32 @@ IFloodlightModule {
 						IDeviceService.fcStore.get(cntx, IDeviceService.CONTEXT_SRC_DEVICE),
 						IRoutingDecision.RoutingAction.DROP);
 				decision.addToContext(cntx);
+			}
+			
+			return Command.CONTINUE;
+		}
+		/*
+		 * ARP response (unicast) can be let through without filtering through
+		 * rules by uncommenting the code below
+		 */
+		/*
+		 * else if (eth.getEtherType() == Ethernet.TYPE_ARP) {
+		 * logger.info("allowing ARP traffic"); decision = new
+		 * FirewallDecision(IRoutingDecision.RoutingAction.FORWARD_OR_FLOOD);
+		 * decision.addToContext(cntx); return Command.CONTINUE; }
+		 */
+
+		// check if we have a matching rule for this packet/flow and no decision has been made yet
+		if (decision == null) {
+			// check if the packet we received matches an existing rule
+			RuleMatchPair rmp = this.matchWithRule(sw, pi, cntx);
+			FirewallRule rule = rmp.rule;
+
+			// Drop the packet if we don't have a rule allowing or dropping it or if we explicitly drop it
+			if (rule == null || rule.action == FirewallRule.FirewallAction.DROP) {
+				decision = new RoutingDecision(sw.getId(), inPort, 
+						IDeviceService.fcStore.get(cntx, IDeviceService.CONTEXT_SRC_DEVICE), 
+						IRoutingDecision.RoutingAction.DROP);
 				
 				//Validamos si es IPv4
 		        if(eth.getEtherType().equals(EthType.IPv4)) {
@@ -629,32 +655,6 @@ IFloodlightModule {
 			        }
 		        }
 		        
-		        
-			}
-			return Command.CONTINUE;
-		}
-		/*
-		 * ARP response (unicast) can be let through without filtering through
-		 * rules by uncommenting the code below
-		 */
-		/*
-		 * else if (eth.getEtherType() == Ethernet.TYPE_ARP) {
-		 * logger.info("allowing ARP traffic"); decision = new
-		 * FirewallDecision(IRoutingDecision.RoutingAction.FORWARD_OR_FLOOD);
-		 * decision.addToContext(cntx); return Command.CONTINUE; }
-		 */
-
-		// check if we have a matching rule for this packet/flow and no decision has been made yet
-		if (decision == null) {
-			// check if the packet we received matches an existing rule
-			RuleMatchPair rmp = this.matchWithRule(sw, pi, cntx);
-			FirewallRule rule = rmp.rule;
-
-			// Drop the packet if we don't have a rule allowing or dropping it or if we explicitly drop it
-			if (rule == null || rule.action == FirewallRule.FirewallAction.DROP) {
-				decision = new RoutingDecision(sw.getId(), inPort, 
-						IDeviceService.fcStore.get(cntx, IDeviceService.CONTEXT_SRC_DEVICE), 
-						IRoutingDecision.RoutingAction.DROP);
 				decision.setMatch(rmp.match);
 				decision.addToContext(cntx);
 				if (logger.isTraceEnabled()) {

@@ -1,4 +1,4 @@
-package net.floodlightcontroller.mactrackerhistory;
+package net.floodlightcontroller.mactracker;
 
 import org.restlet.Context;
 import org.restlet.Restlet;

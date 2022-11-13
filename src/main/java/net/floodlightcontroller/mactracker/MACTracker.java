@@ -29,10 +29,8 @@ import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.core.web.serializers.deviceSerializer;
-import net.floodlightcontroller.mactrackerhistory.MACTrackerHistoryService;
-import net.floodlightcontroller.mactrackerhistory.MACTrackerWebRoutable;
 
-public class MACTracker implements IOFMessageListener, IFloodlightModule, MACTrackerHistoryService {
+public class MACTracker implements IOFMessageListener, IFloodlightModule, MACTrackerService {
 
 	@JsonSerialize(using=deviceSerializer.class)
 	public class Device{
@@ -87,14 +85,14 @@ public class MACTracker implements IOFMessageListener, IFloodlightModule, MACTra
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
 		Collection<Class<? extends IFloodlightService>> l = new ArrayList<Class<? extends IFloodlightService>>();
-	    l.add(MACTrackerHistoryService.class);
+	    l.add(MACTrackerService.class);
 	    return l;
 	}
 
 	@Override
 	public Map<Class<? extends IFloodlightService>, IFloodlightService> getServiceImpls() {
 		Map<Class<? extends IFloodlightService>, IFloodlightService> m = new HashMap<Class<? extends IFloodlightService>, IFloodlightService>();
-	    m.put(MACTrackerHistoryService.class, this);
+	    m.put(MACTrackerService.class, this);
 	    return m;
 	}
 

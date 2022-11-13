@@ -1,11 +1,11 @@
-package net.floodlightcontroller.mactrackerhistory;
+package net.floodlightcontroller.mactracker;
 
 import java.util.ArrayList;
 import net.floodlightcontroller.mactracker.MACTracker.Device;
 
 import net.floodlightcontroller.core.module.IFloodlightService;
 
-public interface MACTrackerHistoryService extends IFloodlightService {
+public interface MACTrackerService extends IFloodlightService {
 	
 	public ArrayList<Device> getHistory();
 	

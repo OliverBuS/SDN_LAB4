@@ -1,4 +1,4 @@
-package net.floodlightcontroller.mactrackerhistory;
+package net.floodlightcontroller.mactracker;
 
 import org.restlet.resource.ServerResource;
 
@@ -11,7 +11,7 @@ import org.restlet.resource.Get;
 public class MACTrackerResource extends ServerResource {
 	@Get("json")
     public ArrayList<Device> retrieve() {
-		MACTrackerHistoryService pihr = (MACTrackerHistoryService)getContext().getAttributes().get(MACTrackerHistoryService.class.getCanonicalName());
+		MACTrackerService pihr = (MACTrackerService)getContext().getAttributes().get(MACTrackerService.class.getCanonicalName());
         return (pihr.getHistory());
     }
 }

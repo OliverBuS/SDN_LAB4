@@ -132,15 +132,6 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 								txBytesCounted = pse.getTxBytes().subtract(spb.getPriorByteValueTx());
 							}
 							
-							String msg = "En el switch " + spb.getSwitchId().toString() + " puerto " + spb.getSwitchPort() ;
-							if( (U64.of(TX_THRESHOLD)).compareTo(txBytesCounted) <0) {
-								
-								log.info(msg+ " se ha superado el valor umbral de {} para TxBytes",  TX_THRESHOLD );
-							}
-							
-							if( (U64.of(RX_THRESHOLD)).compareTo(rxBytesCounted) <0) {
-								log.info(msg+" se ha superado el valor umbral de {} para RxBytes", RX_THRESHOLD);
-							}
 							
 							long timeDifSec = (System.currentTimeMillis() - spb.getUpdateTime()) / MILLIS_PER_SEC;
 							portStats.put(npt, SwitchPortBandwidth.of(npt.getNodeId(), npt.getPortId(), 
@@ -148,6 +139,19 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 									U64.ofRaw((txBytesCounted.getValue() * BITS_PER_BYTE) / timeDifSec), 
 									pse.getRxBytes(), pse.getTxBytes())
 									);
+							
+							String msg = "En el switch " + spb.getSwitchId().toString() + " puerto " + spb.getSwitchPort() ;
+							U64 txBwTemp = U64.ofRaw((txBytesCounted.getValue() * BITS_PER_BYTE) / timeDifSec);
+							U64 rxBwTemp = U64.ofRaw((rxBytesCounted.getValue() * BITS_PER_BYTE) / timeDifSec);
+
+							if( (U64.of(TX_THRESHOLD)).compareTo(txBwTemp) <0) {
+								
+								log.info(msg+ " se ha superado el valor umbral de {} para TxBytes",  TX_THRESHOLD );
+							}
+							
+							if( (U64.of(RX_THRESHOLD)).compareTo(rxBwTemp) <0) {
+								log.info(msg+" se ha superado el valor umbral de {} para RxBytes", RX_THRESHOLD);
+							}
 							
 						} else { /* initialize */
 							tentativePortStats.put(npt, SwitchPortBandwidth.of(npt.getNodeId(), npt.getPortId(), U64.ZERO, U64.ZERO, pse.getRxBytes(), pse.getTxBytes()));
